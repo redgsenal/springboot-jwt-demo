@@ -44,22 +44,26 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // extract the user email from JWT token
         final String userEmail = jwtService.extractUsername(jwt);
         if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            // get user details
             UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
+            // check is token is not expired or revoked
             var isTokenValid = tokenRepository.findByToken(jwt)
                     .map(t -> !t.isExpired() && !t.isRevoked())
                     .orElse(false);
-
-            var isUserTokenValid = jwtService.isTokenValid(jwt, userDetails);
-            if (isUserTokenValid && isTokenValid) {
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                        userDetails,
-                        null,
-                        userDetails.getAuthorities()
-                );
-                authToken.setDetails(
-                        new WebAuthenticationDetailsSource().buildDetails(request)
-                );
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+            if (isTokenValid){
+                // check token is valid with the user details
+                var isUserTokenValid = jwtService.isTokenValid(jwt, userDetails);
+                if (isUserTokenValid) {
+                    UsernamePasswordAuthenticationToken authToken =
+                        new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities()
+                        );
+                    // all is valid, token is valid and corresponds with user details
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                }
             }
         }
         // always do this every time before exiting this filter
